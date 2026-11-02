@@ -1,7 +1,9 @@
 import argparse
 import socket
 import sys
+
 from utils import PacketHeader, compute_checksum
+
 PKT_START = 0
 PKT_END = 1
 PKT_DATA = 2
@@ -43,19 +45,28 @@ def receiver(receiver_ip, receiver_port, window_size):
         seq_num = pkt_header.seq_num
 
         if not connected:
-            if pkt_type == PKT_START:
+            if pkt_type == PKT_START and seq_num == 0:
                 connected = True
                 client_addr = address
-                expected_seq = 0
-                buffer.clear()
+                expected_seq = 1
+                while expected_seq in buffer:
+                    sys.stdout.buffer.write(buffer.pop(expected_seq))
+                    expected_seq += 1
+                sys.stdout.buffer.flush()
+                sys.stdout.flush()
                 s.sendto(create_ack(expected_seq), address)
+            elif pkt_type == PKT_DATA and 0 < seq_num < window_size:
+                if client_addr is None or address == client_addr:
+                    client_addr = address
+                    buffer[seq_num] = msg
+                    s.sendto(create_ack(1), address)
             continue
 
         if address != client_addr:
             continue
 
         if pkt_type == PKT_START:
-            if expected_seq == 0 and not buffer:
+            if seq_num == 0:
                 s.sendto(create_ack(expected_seq), address)
             continue
 
@@ -84,6 +95,8 @@ def receiver(receiver_ip, receiver_port, window_size):
                 s.sendto(create_ack(expected_seq), address)
 
     s.close()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(

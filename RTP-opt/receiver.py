@@ -48,16 +48,21 @@ def receiver(receiver_ip, receiver_port, window_size):
             if pkt_type == PKT_START:
                 connected = True
                 client_addr = address
-                expected_seq = 0
-                buffer.clear()
+                if expected_seq == 0:
+                    expected_seq = 1
                 s.sendto(create_ack(seq_num), address)
+                while expected_seq in buffer:
+                      sys.stdout.buffer.write(buffer.pop(expected_seq))
+                      expected_seq +=1
+                sys.stdout.buffer.flush
+                sys.stdout.flush()
             continue
 
         if address != client_addr:
             continue
 
         if pkt_type == PKT_START:
-            if expected_seq == 0 and not buffer:
+            if seq_num ==0:
                 s.sendto(create_ack(seq_num), address)
             continue
 
